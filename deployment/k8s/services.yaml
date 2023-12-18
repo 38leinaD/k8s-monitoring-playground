@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      name: app
+      labels:
+        app: app
+    spec:
+      containers:
+      - image: app:latest
+        imagePullPolicy: Never
+        name: app
+        readinessProbe:
+          httpGet:
+            path: /hello
+            port: 8080
+          failureThreshold: 20
+          periodSeconds: 30
+        env:
+        - name: TEST
+          value: VALUE
+        ports:
+        - name: http
+          containerPort: 8080
+        resources:
+          limits:
+            cpu: 1.0
+            memory: 0.2G
+          requests:
+            cpu: 0.5
+            memory: 0.2G
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  annotations:
+    se7entyse7en.prometheus/scrape: "true"
+    se7entyse7en.prometheus/path: "q/metrics"
+    se7entyse7en.prometheus/port: "8080"
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: NodePort
+  selector:
+    app: app
