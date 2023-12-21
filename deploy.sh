@@ -22,6 +22,8 @@ all() {
     cd $K8S_FOLDER
 
     kubectl apply -f services.yaml
+    kubectl apply -f monitoring/01-namespace.yaml
+    kubectl create configmap -n monitoring grafana-dashboard-conf --from-file=../test-dashboard.json
     kubectl apply -f monitoring/
 }
 
@@ -33,7 +35,7 @@ access_prom() {
 	minikube service prometheus --namespace=monitoring --url
 }
 
-access_prom() {
+access_grafana() {
 	minikube service grafana --namespace=monitoring --url
 }
 

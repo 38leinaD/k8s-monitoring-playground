@@ -37,6 +37,11 @@ spec:
             - containerPort: 3000
               name: http-grafana
               protocol: TCP
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin1
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: admin123
           readinessProbe:
             failureThreshold: 3
             httpGet:
@@ -63,12 +68,22 @@ spec:
               cpu: 0.5
               memory: 0.75G
           volumeMounts:
-              - mountPath: /var/lib/grafana
-                name: grafana-pv
+          - name: datasource-config
+            mountPath: /etc/grafana/provisioning/datasources
+          - name: dashboard-provider-config
+            mountPath: /etc/grafana/provisioning/dashboards
+          - name: dashboard-config
+            mountPath: /etc/grafana/dashboards
       volumes:
-        - name: grafana-pv
-          persistentVolumeClaim:
-            claimName: grafana-pvc
+        - name: datasource-config
+          configMap:
+            name: grafana-datasource-to-prometheus-conf
+        - name: dashboard-provider-config
+          configMap:
+            name: grafana-dashboard-provider-conf
+        - name: dashboard-config
+          configMap:
+            name: grafana-dashboard-conf
 ---
 apiVersion: v1
 kind: Service
@@ -82,3 +97,98 @@ spec:
       targetPort: http-grafana
   selector:
     app: grafana
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-to-prometheus-conf
+  namespace: monitoring
+  labels:
+    name: grafana-datasource-to-prometheus-conf
+data:
+  prometheus.yml: |-
+    # config file version
+    apiVersion: 1
+    
+    # list of datasources that should be deleted from the database
+    deleteDatasources:
+      - name: Prometheus
+        orgId: 1
+    
+    # list of datasources to insert/update depending
+    # whats available in the database
+    datasources:
+      # <string, required> name of the datasource. Required
+      - name: Prometheus
+        # <string, required> datasource type. Required
+        type: prometheus
+        # <string, required> access mode. direct or proxy. Required
+        access: server
+        # <int> org id. will default to orgId 1 if not specified
+        orgId: 1
+        # <string> url
+        url: http://prometheus:9090
+        # <string> database password, if used
+        password:
+        # <string> database user, if used
+        user:
+        # <string> database name, if used
+        database:
+        # <bool> enable/disable basic auth
+        basicAuth: false
+        # <string> basic auth username, if used
+        basicAuthUser:
+        # <string> basic auth password, if used
+        basicAuthPassword:
+        # <bool> enable/disable with credentials headers
+        withCredentials:
+        # <bool> mark as default datasource. Max one per org
+        isDefault: true
+        # <map> fields that will be converted to json and stored in json_data
+        jsonData:
+          graphiteVersion: "1.1"
+          tlsAuth: false
+          tlsAuthWithCACert: false
+        # <string> json object of data that will be encrypted.
+        secureJsonData:
+          tlsCACert: "..."
+          tlsClientCert: "..."
+          tlsClientKey: "..."
+        version: 1
+        # <bool> allow users to edit datasources from the UI.
+        editable: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider-conf
+  namespace: monitoring
+  labels:
+    name: grafana-dashboard-provider-conf
+data:
+  dashboards.yml: |-
+    apiVersion: 1
+
+    providers:
+      # <string> an unique provider name. Required
+      - name: 'a unique provider name'
+        # <int> Org id. Default to 1
+        orgId: 1
+        # <string> name of the dashboard folder.
+        folder: ''
+        # <string> folder UID. will be automatically generated if not specified
+        folderUid: ''
+        # <string> provider type. Default to 'file'
+        type: file
+        # <bool> disable dashboard deletion
+        disableDeletion: false
+        # <int> how often Grafana will scan for changed dashboards
+        updateIntervalSeconds: 10
+        # <bool> allow updating provisioned dashboards from the UI
+        allowUiUpdates: true
+        options:
+          # <string, required> path to dashboard files on disk. Required when using the 'file' type
+          path: /etc/grafana/dashboards
+          # <bool> use folder names from filesystem to create folders in Grafana
+          foldersFromFilesStructure: true
